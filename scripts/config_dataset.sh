@@ -6,9 +6,9 @@
 #   BIGANN10M   #
 #################
 dataset_bigann10M() {
-  BASE_PATH=/data/datasets/BIGANN/base.10M.u8bin
-  QUERY_FILE=/data/datasets/BIGANN/query.public.10K.128.u8bin
-  GT_FILE=/data/datasets/BIGANN/bigann-10M-gt.bin 
+  BASE_PATH=/data/bigann/base10M.bin
+  QUERY_FILE=/data/bigann/query.public.10K.u8bin
+  GT_FILE=/data/bigann/gt10M.bin
   PREFIX=bigann_10m
   DATA_TYPE=uint8
   DIST_FN=l2
@@ -17,3 +17,4 @@ dataset_bigann10M() {
   DATA_DIM=128
   DATA_N=10000000
 }
+
