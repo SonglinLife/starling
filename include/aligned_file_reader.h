@@ -61,6 +61,7 @@ struct AlignedRead {
   uint64_t offset;  // where to read from
   uint64_t len;     // how much to read
   void*    buf;     // where to read into
+  uint64_t id = 0;
 
   AlignedRead() : offset(0), len(0), buf(nullptr) {
   }

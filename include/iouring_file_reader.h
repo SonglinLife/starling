@@ -18,11 +18,13 @@ class UringReader {
   UringReader(std::string filepath, int MAXIONUM = 1024);
   int submit_IOs(std::vector<AlignedRead>& reqs);
   int waitCompl();
+  std::pair<uint64_t, void*> waitOne();
   ~UringReader(); 
  private:
   static constexpr size_t PAGESIZE = 4096l;
   // a aligned allocator vector of char
   std::vector<char, AlignedAllocator<char>> bufs;
+  std::vector<std::pair<uint64_t, void*>> idwithbuf;
   std::vector<iovec>                        iov;
   int                                       sz = 1024;
   int                                       bufferIndex = 0;

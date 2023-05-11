@@ -1,4 +1,6 @@
 #include "iouring_file_reader.h"
+#include <liburing/io_uring.h>
+#include <cstdint>
 
 template<typename T> 
 T* AlignedAllocator<T>::allocate(std::size_t n){
@@ -25,6 +27,7 @@ UringReader::UringReader(int fd, int MAXIONUM) {
   }
   bufs.resize(PAGESIZE * MAXIONUM);
   iov.resize(MAXIONUM);
+  idwithbuf.resize(MAXIONUM);
   for (int i = 0; i < MAXIONUM; ++i) {
     // register buffer
     iov[i].iov_base = bufs.data() + PAGESIZE * i;
@@ -55,6 +58,7 @@ UringReader::UringReader(std::string filepath, int MAXIONUM) {
   }
   bufs.resize(PAGESIZE * MAXIONUM);
   iov.resize(MAXIONUM);
+  idwithbuf.resize(MAXIONUM);
   for (int i = 0; i < MAXIONUM; ++i) {
     // register buffer
     iov[i].iov_base = bufs.data() + PAGESIZE * i;
@@ -81,8 +85,11 @@ int UringReader::submit_IOs(std::vector<AlignedRead>& reqs) {
     io_uring_sqe_set_flags(sqe, IOSQE_FIXED_FILE);
 
     req.buf = iov[bufferIndex].iov_base;
+    idwithbuf[bufferIndex] = std::pair{req.id, iov[bufferIndex].iov_base}; 
 
-    bufferIndex = (bufferIndex + 1) / sz;
+    io_uring_sqe_set_data(sqe, &(idwithbuf[bufferIndex]));
+
+    bufferIndex = (bufferIndex + 1) % sz;
   }
   // submit IOs
   int ret = io_uring_submit(&ring);
@@ -107,6 +114,20 @@ int UringReader::waitCompl() {
   inflight = 0;
 
   return 0;
+}
+std::pair<uint64_t, void*> UringReader::waitOne(){
+  struct io_uring_cqe* cqe;
+  // wait one
+  int ret = io_uring_wait_cqe(&ring, &cqe);
+  if (ret < 0) {
+    std::cout << "io_uring_wait_cqe error" << std::endl;
+    exit(1);
+  }
+  std::pair<uint64_t, void*>* idbuf = (std::pair<uint64_t, void*> *)io_uring_cqe_get_data(cqe);
+  // advance one
+  io_uring_cq_advance(&ring, 1);
+  inflight -= 1;
+  return *idbuf;
 }
 UringReader::~UringReader() {
   io_uring_unregister_buffers(&ring);

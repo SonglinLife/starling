@@ -260,6 +260,7 @@ namespace diskann {
           frontier_read_reqs.emplace_back(
               (static_cast<_u64>(id2page_[id]+1)) * SECTOR_LEN, SECTOR_LEN,
               fnhood.second);
+          frontier_read_reqs.back().id = id;
           if (stats != nullptr) {
             stats->n_4k++;
             stats->n_ios++;
@@ -293,16 +294,16 @@ namespace diskann {
           if (id == last_io_id) continue;
           const char* node_buf = sector_buf + j * max_node_len;
           float dist = compute_extact_dists_and_push(node_buf, id);
-          vis_cand.emplace_back(dist, node_buf);
+          /* vis_cand.emplace_back(dist, node_buf); */
         }
-        if (vis_size && vis_size != p_size) {
-          std::sort(vis_cand.begin(), vis_cand.end());
-        }
-
-        // compute PQ distances for neighbours of the vectors in the page
-        for (unsigned j = 0; j < vis_size; ++j) {
-          compute_and_push_nbrs(vis_cand[j].second, nk);
-        }
+        /* if (vis_size && vis_size != p_size) { */
+        /*   std::sort(vis_cand.begin(), vis_cand.end()); */
+        /* } */
+        /*  */
+        /* // compute PQ distances for neighbours of the vectors in the page */
+        /* for (unsigned j = 0; j < vis_size; ++j) { */
+        /*   compute_and_push_nbrs(vis_cand[j].second, nk); */
+        /* } */
       }
       last_io_ids.clear();
 
@@ -322,24 +323,26 @@ namespace diskann {
       }
 
       // get last submitted io results, blocking
-      if (!frontier.empty()) {
-        uring_reader->waitCompl();
-        for(int  i = 0; i < frontier_read_reqs.size(); ++i) {
-          frontier_nhoods[i].second = (char*)frontier_read_reqs[i].buf;
-        }
-      }
+      /* if (!frontier.empty()) { */
+      /*   uring_reader->waitCompl(); */
+      /*   for(int  i = 0; i < frontier_read_reqs.size(); ++i) { */
+      /*     frontier_nhoods[i].second = (char*)frontier_read_reqs[i].buf; */
+      /*   } */
+      /* } */
 
       // compute only the desired vectors in the pages - one for each page
       // postpone remaining vectors to the next round
-      for (auto &frontier_nhood : frontier_nhoods) {
-        char *sector_buf = frontier_nhood.second;
-        unsigned pid = id2page_[frontier_nhood.first];
+      int sz = frontier_nhoods.size();
+      for (int i = 0; i < sz; ++i) {
+        auto idbuf = uring_reader->waitOne();
+        char *sector_buf = (char*)idbuf.second;
+        unsigned pid = id2page_[idbuf.first];
         memcpy(last_pages.data() + last_io_ids.size() * SECTOR_LEN, sector_buf, SECTOR_LEN);
-        last_io_ids.emplace_back(frontier_nhood.first);
+        last_io_ids.emplace_back(idbuf.first);
 
         for (unsigned j = 0; j < gp_layout_[pid].size(); ++j) {
           unsigned id = gp_layout_[pid][j];
-          if (id == frontier_nhood.first) {
+          if (id == idbuf.first) {
             char *node_buf = sector_buf + j * max_node_len;
             compute_extact_dists_and_push(node_buf, id);
             compute_and_push_nbrs(node_buf, nk);
