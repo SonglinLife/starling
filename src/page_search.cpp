@@ -227,7 +227,7 @@ namespace diskann {
       while (marker < cur_list_size && frontier.size() < beam_width &&
              num_seen < beam_width) {
         const unsigned pid = id2page_[retset[marker].id];
-        if (page_visited.find(pid) == page_visited.end() && retset[marker].flag) {
+        if (retset[marker].flag) {
           num_seen++;
           auto iter = nhood_cache.find(retset[marker].id);
           if (iter != nhood_cache.end()) {
@@ -337,8 +337,8 @@ namespace diskann {
         auto idbuf = uring_reader->waitOne();
         char *sector_buf = (char*)idbuf.second;
         unsigned pid = id2page_[idbuf.first];
-        memcpy(last_pages.data() + last_io_ids.size() * SECTOR_LEN, sector_buf, SECTOR_LEN);
-        last_io_ids.emplace_back(idbuf.first);
+        /* memcpy(last_pages.data() + last_io_ids.size() * SECTOR_LEN, sector_buf, SECTOR_LEN); */
+        /* last_io_ids.emplace_back(idbuf.first); */
 
         for (unsigned j = 0; j < gp_layout_[pid].size(); ++j) {
           unsigned id = gp_layout_[pid][j];
