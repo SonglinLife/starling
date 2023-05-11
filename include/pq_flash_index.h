@@ -10,6 +10,7 @@
 #include "tsl/robin_set.h"
 
 #include "aligned_file_reader.h"
+#include "iouring_file_reader.h"
 #include "concurrent_queue.h"
 #include "neighbor.h"
 #include "parameters.h"
@@ -62,6 +63,7 @@ namespace diskann {
   struct ThreadData {
     QueryScratch<T> scratch;
     IOContext       ctx;
+    std::shared_ptr<UringReader> uring_reader;
   };
   
   template<typename T>

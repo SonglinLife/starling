@@ -45,6 +45,7 @@ namespace diskann {
       this->thread_data.wait_for_push_notify();
       data = this->thread_data.pop();
     }
+    auto uring_reader = data.uring_reader;
 
     if (beam_width > MAX_N_SECTOR_READS)
       throw ANNException("Beamwidth can not be higher than MAX_N_SECTOR_READS",
@@ -252,7 +253,8 @@ namespace diskann {
           auto                    id = frontier[i];
           std::pair<_u32, char *> fnhood;
           fnhood.first = id;
-          fnhood.second = sector_scratch + sector_scratch_idx * SECTOR_LEN;
+          /* fnhood.second = sector_scratch + sector_scratch_idx * SECTOR_LEN; */
+          fnhood.second = nullptr;
           sector_scratch_idx++;
           frontier_nhoods.push_back(fnhood);
           frontier_read_reqs.emplace_back(
@@ -264,7 +266,7 @@ namespace diskann {
           }
           num_ios++;
         }
-        n_ops = reader->submit_reqs(frontier_read_reqs, ctx);
+        n_ops = uring_reader->submit_IOs(frontier_read_reqs);
         if (this->count_visited_nodes) {
 #pragma omp critical
           {
@@ -321,7 +323,10 @@ namespace diskann {
 
       // get last submitted io results, blocking
       if (!frontier.empty()) {
-        reader->get_events(ctx, n_ops);
+        uring_reader->waitCompl();
+        for(int  i = 0; i < frontier_read_reqs.size(); ++i) {
+          frontier_nhoods[i].second = (char*)frontier_read_reqs[i].buf;
+        }
       }
 
       // compute only the desired vectors in the pages - one for each page

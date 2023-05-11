@@ -79,6 +79,7 @@ class AlignedFileReader {
   tsl::robin_map<std::thread::id, IOContext> ctx_map;
   std::mutex                                 ctx_mut;
 
+
  public:
   // returns the thread-specific context
   // returns (io_context_t)(-1) if thread is not registered
@@ -103,4 +104,5 @@ class AlignedFileReader {
                     bool async = false) = 0;
   virtual int submit_reqs(std::vector<AlignedRead>& read_reqs, IOContext& ctx) = 0;
   virtual void get_events(IOContext &ctx, int n_ops) = 0;
+  virtual int get_fd() = 0;
 };

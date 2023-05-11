@@ -245,3 +245,6 @@ void LinuxAlignedFileReader::get_events(IOContext& ctx, int n_ops) {
     exit(-1);
   }
 }
+int LinuxAlignedFileReader::get_fd() {
+  return this->file_desc;
+}

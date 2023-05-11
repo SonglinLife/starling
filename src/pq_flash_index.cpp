@@ -127,6 +127,7 @@ namespace diskann {
         ThreadData<T> data;
         data.ctx = ctx;
         data.scratch = scratch;
+        data.uring_reader = std::make_shared<UringReader>(this->reader->get_fd(), 1024);
         this->thread_data.push(data);
       }
     }
@@ -139,6 +140,7 @@ namespace diskann {
     assert(this->thread_data.size() == this->max_nthreads);
     while (this->thread_data.size() > 0) {
       ThreadData<T> data = this->thread_data.pop();
+      data.uring_reader.reset();
       while (data.scratch.sector_scratch == nullptr) {
         this->thread_data.wait_for_push_notify();
         data = this->thread_data.pop();
@@ -180,11 +182,11 @@ namespace diskann {
                            coord_cache_buf_len * sizeof(T), 8 * sizeof(T));
     memset(coord_cache_buf, 0, coord_cache_buf_len * sizeof(T));
 
-    size_t BLOCK_SIZE = 8;
-    size_t num_blocks = DIV_ROUND_UP(num_cached_nodes, BLOCK_SIZE);
+    size_t BLOCK_SIZE_T = 8;
+    size_t num_blocks = DIV_ROUND_UP(num_cached_nodes, BLOCK_SIZE_T);
     for (_u64 block = 0; block < num_blocks; block++) {
-      _u64 start_idx = block * BLOCK_SIZE;
-      _u64 end_idx = (std::min)(num_cached_nodes, (block + 1) * BLOCK_SIZE);
+      _u64 start_idx = block * BLOCK_SIZE_T;
+      _u64 end_idx = (std::min)(num_cached_nodes, (block + 1) * BLOCK_SIZE_T);
       std::vector<AlignedRead>             read_reqs;
       std::vector<std::pair<_u32, char *>> nhoods;
       for (_u64 node_idx = start_idx; node_idx < end_idx; node_idx++) {
@@ -396,13 +398,13 @@ namespace diskann {
       diskann::cout << "Level: " << lvl << std::flush;
       bool finish_flag = false;
 
-      uint64_t BLOCK_SIZE = 1024;
-      uint64_t nblocks = DIV_ROUND_UP(nodes_to_expand.size(), BLOCK_SIZE);
+      uint64_t BLOCK_SIZE_T = 1024;
+      uint64_t nblocks = DIV_ROUND_UP(nodes_to_expand.size(), BLOCK_SIZE_T);
       for (size_t block = 0; block < nblocks && !finish_flag; block++) {
         diskann::cout << "." << std::flush;
-        size_t start = block * BLOCK_SIZE;
+        size_t start = block * BLOCK_SIZE_T;
         size_t end =
-            (std::min)((block + 1) * BLOCK_SIZE, nodes_to_expand.size());
+            (std::min)((block + 1) * BLOCK_SIZE_T, nodes_to_expand.size());
         std::vector<AlignedRead>             read_reqs;
         std::vector<std::pair<_u32, char *>> nhoods;
         for (size_t cur_pt = start; cur_pt < end; cur_pt++) {
