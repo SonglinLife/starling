@@ -120,6 +120,7 @@ namespace diskann {
       }
     }
 
+    std::unordered_map<uint64_t, void*> page_cache;
     // lambda to batch compute query<-> node distances in PQ space
     auto compute_pq_dists = [this, pq_coord_scratch, pq_dists](const unsigned *ids,
                                                             const _u64 n_ids,
@@ -222,14 +223,21 @@ namespace diskann {
       // find new beam
       _u32 marker = k;
       _u32 num_seen = 0;
-
+      
+      std::vector<std::pair<uint64_t, void*>> page_cache_hits;
       // distribute cache and disk-read nodes
       while (marker < cur_list_size && frontier.size() < beam_width &&
              num_seen < beam_width) {
         const unsigned pid = id2page_[retset[marker].id];
         if (retset[marker].flag) {
           num_seen++;
+          if(page_cache.find(pid) != page_cache.end()) {
+            page_cache_hits.push_back(std::make_pair(retset[marker].id, page_cache[pid]));
+            retset[marker].flag = false;
+            continue;
+          }
           auto iter = nhood_cache.find(retset[marker].id);
+
           if (iter != nhood_cache.end()) {
             cached_nhoods.push_back(
                 std::make_pair(retset[marker].id, iter->second));
@@ -277,35 +285,6 @@ namespace diskann {
         }
       }
 
-      // compute remaining nodes in the pages that are fetched in the previous round
-      for (size_t i = 0; i < last_io_ids.size(); ++i) {
-        const unsigned last_io_id = last_io_ids[i];
-        char    *sector_buf = last_pages.data() + i * SECTOR_LEN;
-        const unsigned pid = id2page_[last_io_id];
-        const unsigned p_size = gp_layout_[pid].size();
-        // minus one for the vector that is computed previously
-        unsigned vis_size = use_ratio * (p_size - 1);
-        std::vector<std::pair<float, const char*>> vis_cand;
-        vis_cand.reserve(p_size);
-
-        // compute exact distances of the vectors within the page
-        for (unsigned j = 0; j < p_size; ++j) {
-          const unsigned id = gp_layout_[pid][j];
-          if (id == last_io_id) continue;
-          const char* node_buf = sector_buf + j * max_node_len;
-          float dist = compute_extact_dists_and_push(node_buf, id);
-          /* vis_cand.emplace_back(dist, node_buf); */
-        }
-        /* if (vis_size && vis_size != p_size) { */
-        /*   std::sort(vis_cand.begin(), vis_cand.end()); */
-        /* } */
-        /*  */
-        /* // compute PQ distances for neighbours of the vectors in the page */
-        /* for (unsigned j = 0; j < vis_size; ++j) { */
-        /*   compute_and_push_nbrs(vis_cand[j].second, nk); */
-        /* } */
-      }
-      last_io_ids.clear();
 
       // process cached nhoods
       for (auto &cached_nhood : cached_nhoods) {
@@ -321,14 +300,22 @@ namespace diskann {
         compute_extact_dists_and_push(node_buf, id);
         compute_and_push_nbrs(node_buf, nk);
       }
+      
+      // process cached page 
+      for(auto [hit_id, hit_page]: page_cache_hits) {
+        
+        char *sector_buf = (char*)hit_page;
+        unsigned pid = id2page_[hit_id];
 
-      // get last submitted io results, blocking
-      /* if (!frontier.empty()) { */
-      /*   uring_reader->waitCompl(); */
-      /*   for(int  i = 0; i < frontier_read_reqs.size(); ++i) { */
-      /*     frontier_nhoods[i].second = (char*)frontier_read_reqs[i].buf; */
-      /*   } */
-      /* } */
+        for (unsigned j = 0; j < gp_layout_[pid].size(); ++j) {
+          unsigned id = gp_layout_[pid][j];
+          if (id == hit_id) {
+            char *node_buf = sector_buf + j * max_node_len;
+            compute_extact_dists_and_push(node_buf, id);
+            compute_and_push_nbrs(node_buf, nk);
+          }
+        }
+      }
 
       // compute only the desired vectors in the pages - one for each page
       // postpone remaining vectors to the next round
@@ -337,8 +324,7 @@ namespace diskann {
         auto idbuf = uring_reader->waitOne();
         char *sector_buf = (char*)idbuf.second;
         unsigned pid = id2page_[idbuf.first];
-        /* memcpy(last_pages.data() + last_io_ids.size() * SECTOR_LEN, sector_buf, SECTOR_LEN); */
-        /* last_io_ids.emplace_back(idbuf.first); */
+        page_cache.insert({pid, sector_buf});
 
         for (unsigned j = 0; j < gp_layout_[pid].size(); ++j) {
           unsigned id = gp_layout_[pid][j];
