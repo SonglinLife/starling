@@ -94,7 +94,7 @@ int UringReader::submit_IOs(std::vector<AlignedRead>& reqs) {
   // submit IOs
   int ret = io_uring_submit(&ring);
   if (ret != (int) reqs.size()) {
-    std::cout << "io_uring_submit error" << std::endl;
+    std::cout << "io_uring_submit error the req size is "<<reqs.size()<<" the ret is "<< ret << std::endl;
     exit(1);
   }
   inflight += reqs.size();

@@ -140,7 +140,7 @@ case $2 in
       time ${EXE_PATH}/graph_partition/partitioner --index_file ${OLD_INDEX_FILE} \
         --data_type $GP_DATA_TYPE --gp_file $GP_FILE_PATH -T $GP_T --ldg_times $GP_TIMES --freq_file ${FREQ_PATH}_freq.bin --lock_nums ${GP_LOCK_NUMS} --cut ${GP_CUT} > ${GP_FILE_PATH}.log
     else
-      time ~/data/starling/BBAnn/build/src/lib/partitioner $BASE_PATH $GP_FILE_PATH $R $GP_DATA_TYPE
+      time /data/BBAnn/build/src/lib/partitioner $BASE_PATH $GP_FILE_PATH $R $GP_DATA_TYPE
       # --index_file ${OLD_INDEX_FILE} \
       #   --data_type $GP_DATA_TYPE --gp_file $GP_FILE_PATH -T $GP_T --ldg_times $GP_TIMES > ${GP_FILE_PATH}.log
     fi
